@@ -1,15 +1,18 @@
 package com.soares.payment_api.Service;
 
+import com.google.zxing.WriterException;
 import com.soares.payment_api.dto.PaymentRequest;
 import com.soares.payment_api.dto.PaymentResponse;
 import com.soares.payment_api.entity.Payment;
 import com.soares.payment_api.enums.PaymentStatus;
+import com.soares.payment_api.exception.*;
 import com.soares.payment_api.repository.PaymentRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -17,10 +20,15 @@ import java.util.List;
 @Service
 public class PaymentService {
     private final PaymentRepository repository;
+    private final QrCodeService qrCodeService;
 
-    public PaymentService(PaymentRepository repository) {
+
+    public PaymentService(PaymentRepository repository, QrCodeService qrCodeService) {
         this.repository = repository;
+        this.qrCodeService = qrCodeService;
     }
+
+
 
     public PaymentResponse save(PaymentRequest request) {
 
@@ -35,7 +43,29 @@ public class PaymentService {
         //  payment.setPaidAt(null);
 
         payment = repository.save(payment);
-        return toResponse(payment);
+
+        String content =
+                        "paymentId=" + payment.getId() +
+                        ";amount=" + payment.getAmount() +
+                        ";description=" + payment.getDescription() +
+                        ";createdAt=" + payment.getCreatedAt() +
+                        ";expiresAt=" + payment.getExpiresAt();
+
+        String qrCode;
+
+        try {
+            qrCode = qrCodeService.generateQrCode(content);
+        } catch (WriterException | IOException e) {
+            throw new RuntimeException("Error generating QR Code");
+        }
+
+        PaymentResponse response = toResponse(payment);
+
+        response.setQrCode(qrCode);
+
+        return response;
+
+
     }
 
 
@@ -64,10 +94,7 @@ public class PaymentService {
         Payment existingPayment = findPaymentById(id);
 
         if (existingPayment.getStatus() != PaymentStatus.PENDING) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Only pending payments can be updated"
-            );
+            throw new PaymentUpdateNotAllowedException("Only pending payments can be updated");
         }
 
         existingPayment.setDescription(request.getDescription());
@@ -85,11 +112,8 @@ public class PaymentService {
 
    private Payment findPaymentById(Long id){
 
-        return repository.findById(id)
-                .orElseThrow(()-> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND,
-                        "Payment not found"
-                        ));
+       return repository.findById(id)
+               .orElseThrow(() -> new PaymentNotFoundException("Payment not found"));
    }
 
    private PaymentResponse toResponse(Payment payment){
@@ -110,24 +134,15 @@ public class PaymentService {
         Payment payment = findPaymentById(id);
 
         if (payment.getStatus() == PaymentStatus.PAID) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Payment is already paid"
-            );
+            throw new PaymentAlreadyPaidException("Payment is already paid");
         }
 
         if (payment.getStatus() == PaymentStatus.CANCELED) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Payment is already cancelled"
-            );
+            throw new PaymentCanceledException("Payment is cancelled");
         }
 
         if (payment.getStatus() == PaymentStatus.EXPIRED) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Payment expired"
-            );
+            throw new PaymentExpiredException("Payment is expired");
         }
 
         if (LocalDateTime.now().isAfter(payment.getExpiresAt())) {
@@ -135,10 +150,7 @@ public class PaymentService {
             payment.setStatus(PaymentStatus.EXPIRED);
             repository.save(payment);
 
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Payment expired"
-            );
+            throw new PaymentExpiredException("Payment is expired");
         }
 
         payment.setStatus(PaymentStatus.PAID);
@@ -152,31 +164,19 @@ public class PaymentService {
     public PaymentResponse cancel(Long id){
         Payment payment = findPaymentById(id);
         if (payment.getStatus() == PaymentStatus.CANCELED){
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Payment is already cancelled"
-            );
+            throw new PaymentCanceledException("Payment is already cancelled");
         }
         if (payment.getStatus() == PaymentStatus.PAID){
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Payment is already paid"
-            );
+            throw new PaymentAlreadyPaidException("Payment is already paid");
         }
         if (payment.getStatus() == PaymentStatus.EXPIRED){
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Payment is already expired"
-            );
+            throw new PaymentExpiredException("Payment is already expired");
         }
         if (LocalDateTime.now().isAfter(payment.getExpiresAt())) {
             payment.setStatus(PaymentStatus.EXPIRED);
             repository.save(payment);
 
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Payment is already expired"
-            );
+            throw new PaymentExpiredException("Payment is already expired");
         }
 
         payment.setStatus(PaymentStatus.CANCELED);

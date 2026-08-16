@@ -14,6 +14,7 @@ public class PaymentResponse {
     private LocalDateTime createdAt;
     private LocalDateTime expiresAt;
     private LocalDateTime paidAt;
+    private String qrCode;
 
     public Long getId() {
         return id;
@@ -69,5 +70,13 @@ public class PaymentResponse {
 
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public String getQrCode() {
+        return qrCode;
+    }
+
+    public void setQrCode(String qrCode) {
+        this.qrCode = qrCode;
     }
 }
