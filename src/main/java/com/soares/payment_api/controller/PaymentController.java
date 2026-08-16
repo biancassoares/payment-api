@@ -42,4 +42,14 @@ public class PaymentController {
         service.delete(id);
     }
 
+    @PostMapping("/{id}/pay")
+    public PaymentResponse pay(@PathVariable Long id){
+        return service.pay(id);
+    }
+
+    @PostMapping("/{id}/cancel")
+    public PaymentResponse cancel(@PathVariable Long id){
+        return service.cancel(id);
+    }
+
 }

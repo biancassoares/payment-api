@@ -22,30 +22,20 @@ public class PaymentService {
         this.repository = repository;
     }
 
-    public PaymentResponse save(PaymentRequest request){
+    public PaymentResponse save(PaymentRequest request) {
 
-            Payment payment = new Payment();
-            LocalDateTime now = LocalDateTime.now();
+        Payment payment = new Payment();
+        LocalDateTime now = LocalDateTime.now();
 
-                payment.setDescription(request.getDescription());
-                payment.setAmount(request.getAmount());
-                payment.setStatus(PaymentStatus.PENDING);
-                payment.setCreatedAt(now);
-                payment.setExpiresAt(now.plusMinutes(15));
-                //  payment.setPaidAt(null);
+        payment.setDescription(request.getDescription());
+        payment.setAmount(request.getAmount());
+        payment.setStatus(PaymentStatus.PENDING);
+        payment.setCreatedAt(now);
+        payment.setExpiresAt(now.plusMinutes(15));
+        //  payment.setPaidAt(null);
 
-                payment = repository.save(payment);
-
-                PaymentResponse response = new PaymentResponse();
-                response.setId(payment.getId());
-                response.setDescription(payment.getDescription());
-                response.setAmount(payment.getAmount());
-                response.setStatus(payment.getStatus());
-                response.setCreatedAt(payment.getCreatedAt());
-                response.setExpiresAt(payment.getExpiresAt());
-                response.setPaidAt(payment.getPaidAt());
-
-                return response;
+        payment = repository.save(payment);
+        return toResponse(payment);
     }
 
 
@@ -56,17 +46,7 @@ public class PaymentService {
 
         for (Payment payment : payments) {
 
-            PaymentResponse response = new PaymentResponse();
-
-            response.setId(payment.getId());
-            response.setDescription(payment.getDescription());
-            response.setAmount(payment.getAmount());
-            response.setStatus(payment.getStatus());
-            response.setCreatedAt(payment.getCreatedAt());
-            response.setExpiresAt(payment.getExpiresAt());
-            response.setPaidAt(payment.getPaidAt());
-
-            responses.add(response);
+            responses.add(toResponse(payment));
         }
 
         return responses;
@@ -74,33 +54,14 @@ public class PaymentService {
 
     public PaymentResponse findById(long id) {
 
-        Payment existingPayment = repository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND,
-                        "Payment not found"
-                ));
-
-        PaymentResponse response = new PaymentResponse();
-
-        response.setId(existingPayment.getId());
-        response.setDescription(existingPayment.getDescription());
-        response.setAmount(existingPayment.getAmount());
-        response.setStatus(existingPayment.getStatus());
-        response.setCreatedAt(existingPayment.getCreatedAt());
-        response.setExpiresAt(existingPayment.getExpiresAt());
-        response.setPaidAt(existingPayment.getPaidAt());
-
-        return response;
+        Payment existingPayment = findPaymentById(id);
+        return toResponse(existingPayment);
     }
 
     @Transactional
     public PaymentResponse update(long id, PaymentRequest request) {
 
-        Payment existingPayment = repository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND,
-                        "Payment not found"
-                ));
+        Payment existingPayment = findPaymentById(id);
 
         if (existingPayment.getStatus() != PaymentStatus.PENDING) {
             throw new ResponseStatusException(
@@ -114,26 +75,116 @@ public class PaymentService {
 
         existingPayment = repository.save(existingPayment);
 
-        PaymentResponse response = new PaymentResponse();
-
-        response.setId(existingPayment.getId());
-        response.setDescription(existingPayment.getDescription());
-        response.setAmount(existingPayment.getAmount());
-        response.setStatus(existingPayment.getStatus());
-        response.setCreatedAt(existingPayment.getCreatedAt());
-        response.setExpiresAt(existingPayment.getExpiresAt());
-        response.setPaidAt(existingPayment.getPaidAt());
-
-        return response;
+        return toResponse(existingPayment);
     }
 
-    public void delete (Long id){
-        Payment existingPayment = repository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(
+    public void delete(Long id) {
+        Payment payment = findPaymentById(id);
+        repository.delete(payment);
+    }
+
+   private Payment findPaymentById(Long id){
+
+        return repository.findById(id)
+                .orElseThrow(()-> new ResponseStatusException(
                         HttpStatus.NOT_FOUND,
                         "Payment not found"
-                ));
-        repository.delete(existingPayment);
+                        ));
+   }
 
+   private PaymentResponse toResponse(Payment payment){
+       PaymentResponse response = new PaymentResponse();
+
+       response.setId(payment.getId());
+       response.setDescription(payment.getDescription());
+       response.setAmount(payment.getAmount());
+       response.setStatus(payment.getStatus());
+       response.setCreatedAt(payment.getCreatedAt());
+       response.setExpiresAt(payment.getExpiresAt());
+       response.setPaidAt(payment.getPaidAt());
+
+        return response;
+   }
+    public PaymentResponse pay(Long id) {
+
+        Payment payment = findPaymentById(id);
+
+        if (payment.getStatus() == PaymentStatus.PAID) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Payment is already paid"
+            );
+        }
+
+        if (payment.getStatus() == PaymentStatus.CANCELED) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Payment is already cancelled"
+            );
+        }
+
+        if (payment.getStatus() == PaymentStatus.EXPIRED) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Payment expired"
+            );
+        }
+
+        if (LocalDateTime.now().isAfter(payment.getExpiresAt())) {
+
+            payment.setStatus(PaymentStatus.EXPIRED);
+            repository.save(payment);
+
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Payment expired"
+            );
+        }
+
+        payment.setStatus(PaymentStatus.PAID);
+        payment.setPaidAt(LocalDateTime.now());
+
+        payment = repository.save(payment);
+
+        return toResponse(payment);
     }
+
+    public PaymentResponse cancel(Long id){
+        Payment payment = findPaymentById(id);
+        if (payment.getStatus() == PaymentStatus.CANCELED){
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Payment is already cancelled"
+            );
+        }
+        if (payment.getStatus() == PaymentStatus.PAID){
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Payment is already paid"
+            );
+        }
+        if (payment.getStatus() == PaymentStatus.EXPIRED){
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Payment is already expired"
+            );
+        }
+        if (LocalDateTime.now().isAfter(payment.getExpiresAt())) {
+            payment.setStatus(PaymentStatus.EXPIRED);
+            repository.save(payment);
+
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Payment is already expired"
+            );
+        }
+
+        payment.setStatus(PaymentStatus.CANCELED);
+        payment = repository.save(payment);
+        return  toResponse(payment);
+    }
+
+
+
 }
+
