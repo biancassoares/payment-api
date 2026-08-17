@@ -1,4 +1,4 @@
-package com.soares.payment_api.Service;
+package com.soares.payment_api.service;
 
 import com.google.zxing.BarcodeFormat;
 import com.google.zxing.WriterException;

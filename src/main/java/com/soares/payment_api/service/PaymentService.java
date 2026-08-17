@@ -1,4 +1,4 @@
-package com.soares.payment_api.Service;
+package com.soares.payment_api.service;
 
 import com.google.zxing.WriterException;
 import com.soares.payment_api.dto.PaymentRequest;
@@ -7,10 +7,8 @@ import com.soares.payment_api.entity.Payment;
 import com.soares.payment_api.enums.PaymentStatus;
 import com.soares.payment_api.exception.*;
 import com.soares.payment_api.repository.PaymentRepository;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
@@ -56,7 +54,7 @@ public class PaymentService {
         try {
             qrCode = qrCodeService.generateQrCode(content);
         } catch (WriterException | IOException e) {
-            throw new RuntimeException("Error generating QR Code");
+            throw new QrCodeGenerationException("Error generating QR Code");
         }
 
         PaymentResponse response = toResponse(payment);

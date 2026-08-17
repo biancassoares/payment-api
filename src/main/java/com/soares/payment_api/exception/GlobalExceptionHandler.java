@@ -38,6 +38,12 @@ public class GlobalExceptionHandler {
         return ex.getMessage();
     }
 
+    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+    @ExceptionHandler(QrCodeGenerationException.class)
+    public String handleQrCodeGenerationException (QrCodeGenerationException ex) {
+        return  ex.getMessage();
+    }
+
 
 
 }

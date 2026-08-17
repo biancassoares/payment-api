@@ -1,14 +1,12 @@
 package com.soares.payment_api.controller;
 
-import com.soares.payment_api.Service.PaymentService;
+import com.soares.payment_api.service.PaymentService;
 import com.soares.payment_api.dto.PaymentRequest;
 import com.soares.payment_api.dto.PaymentResponse;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-
-import static org.springframework.data.jpa.domain.AbstractPersistable_.id;
 
 @RestController
 @RequestMapping("payments")
