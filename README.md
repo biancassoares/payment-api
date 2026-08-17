@@ -1,4 +1,4 @@
-## 🎯 Objetivo do projeto
+## 💳 Payment API
 
 Depois de desenvolver a **Transaction API**, quis criar um projeto para continuar praticando conceitos de backend além de um CRUD tradicional.
 
